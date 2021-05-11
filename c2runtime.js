@@ -4,7 +4,7 @@
 // ECMAScript 5 strict mode
 
 // Create the cr namespace for all runtime names
-window.cr = {};
+var cr = window.cr = {};
 cr.plugins_ = {};
 cr.behaviors = {};
 
@@ -5139,7 +5139,8 @@ quat4.str=function(a){return"["+a[0]+", "+a[1]+", "+a[2]+", "+a[3]+"]"};
 				above the top of the screen, but the scroll position
 				doesn't revert once the keyboard closes
 			*/
-			window.addEventListener("focusout", () => {
+			window.addEventListener("focusout", function ()
+			{
 				if (!KeyboardIsVisible())
 					document.scrollingElement.scrollTop = 0;
 			});
@@ -6146,12 +6147,13 @@ quat4.str=function(a){return"["+a[0]+", "+a[1]+", "+a[2]+", "+a[3]+"]"};
 				loaderlogos.logo = null;
 			});
 				
-			// In preview mode allow for requesting loading-logo.png from blob project files list
+			// In preview mode allow for requesting the loading logo image from blob project files list
+			var loadingLogoFilename = pm[39];
 			var loadingLogoUrl;
 			if (this.isPreview)
-				loadingLogoUrl = this.getProjectFileUrl("loading-logo.png");
+				loadingLogoUrl = this.getProjectFileUrl(loadingLogoFilename);
 			else
-				loadingLogoUrl = this.iconsFolder + "loading-logo.png";
+				loadingLogoUrl = this.iconsFolder + loadingLogoFilename;
 			this.setImageSrc(loaderImage, loadingLogoUrl);
 		}
 		else if (this.loaderstyle === 4)	// c3 splash
@@ -6415,7 +6417,8 @@ quat4.str=function(a){return"["+a[0]+", "+a[1]+", "+a[2]+", "+a[3]+"]"};
 			}
 			
 			// Store tilemap collision polys (if any)
-			type_inst.tile_poly_data = m[13];
+			var tilePolyData = m[13];
+			type_inst.tile_poly_data = (tilePolyData ? tilePolyData[0] : null);
 			
 			// Create and seal.  However note when using loader layouts, defer creation of
 			// object types not on the loader layout at this point.  Images are loaded in
@@ -6447,7 +6450,7 @@ quat4.str=function(a){return"["+a[0]+", "+a[1]+", "+a[2]+", "+a[3]+"]"};
 				instance.iid = 0;
 				instance.get_iid = cr.inst_get_iid;
 				instance.toString = cr.inst_toString;
-				instance.properties = m[15];
+				instance.properties = m[16];
 
 				instance.onCreate();
 				cr.seal(instance);
@@ -8414,7 +8417,7 @@ quat4.str=function(a){return"["+a[0]+", "+a[1]+", "+a[2]+", "+a[3]+"]"};
 			inst.tilemap_height = 0;
 			inst.tilemap_data = null;
 			
-			if (wm.length === 14)
+			if (wm[13])
 			{
 				inst.tilemap_exists = true;
 				inst.tilemap_width = wm[13][0];
@@ -12407,8 +12410,6 @@ window["cr_setSuspended"] = function(s)
 	
 	Layer.prototype.drawGL = function (glw)
 	{
-		var windowWidth = this.runtime.draw_width;
-		var windowHeight = this.runtime.draw_height;
 		var shaderindex = 0;
 		var etindex = 0;
 		
@@ -12667,6 +12668,8 @@ window["cr_setSuspended"] = function(s)
 		var shaderindex = inst.active_effect_types[0].shaderindex;
 		var etindex = inst.active_effect_types[0].index;
 		var myscale = this.getScale();
+		var windowWidth = this.runtime.draw_width;
+		var windowHeight = this.runtime.draw_height;
 		
 		if (inst.active_effect_types.length === 1 && !glw.programUsesCrossSampling(shaderindex) &&
 			!glw.programExtendsBox(shaderindex) && ((!inst.angle && !inst.layer.getAngle()) || !glw.programUsesDest(shaderindex)) &&
@@ -14992,7 +14995,7 @@ window["cr_setSuspended"] = function(s)
 		}
 	};
 	
-	/*c2h=562f4185-b90a-4537-b491-ac74a1717432*/
+	/*c2h=3a017034-51d6-40f4-ac1f-692b647f04a8*/
 	
 	EventBlock.prototype.postInit = function (hasElse/*, prevBlock_*/)
 	{
@@ -20525,6 +20528,9 @@ cr.system_object.prototype.loadFromJSON = function (o)
 		var appearance_aces = m[6];
 		var zorder_aces = m[7];
 		var effects_aces = m[8];
+		var element_aces = m[10];
+		var element_focus_aces = m[11];
+		var element_enabled_aces = m[12];
 				
 		if (!pluginProto.cnds)
 			pluginProto.cnds = {};
@@ -21444,6 +21450,44 @@ cr.system_object.prototype.loadFromJSON = function (o)
 					if (et.active)
 						this.runtime.redraw = true;
 				}
+			};
+		}
+
+		if (element_aces)
+		{
+			acts.SetVisible = function (vis)
+			{
+				this.visible = (vis !== 0);
+			};
+
+			acts.SetCSSStyle = function (p, v)
+			{
+				this.elem.style[cr.cssToCamelCase(p)] = v;
+			};
+		}
+
+		if (element_focus_aces)
+		{
+			acts.SetFocus = function ()
+			{
+				// hack for checkbox buttons
+				var elem = (this.inputElem || this.elem);
+				elem.focus();
+			};
+
+			acts.SetBlur = function ()
+			{
+				var elem = (this.inputElem || this.elem);
+				elem.blur();
+			};
+		}
+
+		if (element_enabled_aces)
+		{
+			acts.SetEnabled = function (en)
+			{
+				var elem = (this.inputElem || this.elem);
+				elem.disabled = (en === 0);
 			};
 		}
 	};
@@ -34746,9 +34790,10 @@ cr.plugins_.TextBox = function(runtime)
 	// Actions
 	function Acts() {};
 	
-	Acts.prototype.SetText = function (text)
+	Acts.prototype.SetText = function (param)
 	{
-		this.elem.value = text;
+		// Note this is an "any" type parameter
+		this.elem.value = param.toString();
 	};
 	
 	Acts.prototype.SetPlaceholder = function (text)
@@ -34761,34 +34806,9 @@ cr.plugins_.TextBox = function(runtime)
 		this.elem.title = text;
 	};
 	
-	Acts.prototype.SetVisible = function (vis)
-	{
-		this.visible = (vis !== 0);
-	};
-	
-	Acts.prototype.SetEnabled = function (en)
-	{
-		this.elem.disabled = (en === 0);
-	};
-	
 	Acts.prototype.SetReadOnly = function (ro)
 	{
 		this.elem.readOnly = (ro === 0);
-	};
-	
-	Acts.prototype.SetFocus = function ()
-	{
-		this.elem.focus();
-	};
-	
-	Acts.prototype.SetBlur = function ()
-	{
-		this.elem.blur();
-	};
-	
-	Acts.prototype.SetCSSStyle = function (p, v)
-	{
-		this.elem.style[cr.cssToCamelCase(p)] = v;
 	};
 	
 	Acts.prototype.ScrollToBottom = function ()
@@ -37842,117 +37862,117 @@ cr.getObjectRefTable = function () {
 		cr.plugins_.AJAX.prototype.exps.LastData
 	];
 };
-self.C3_JsPropNameTable = [
-	{mouse: 0},
-	{bgPlay: 0},
-	{HUDBg: 0},
-	{divider: 0},
-	{walls: 0},
-	{Touch: 0},
-	{Score: 0},
-	{Text3: 0},
-	{replay: 0},
-	{home: 0},
-	{Panel: 0},
-	{GO_Score: 0},
-	{GO_Best: 0},
-	{Fade: 0},
-	{Fade2: 0},
-	{Transition: 0},
-	{WebStorage: 0},
-	{Audio: 0},
-	{Browser: 0},
-	{touchPLAY: 0},
-	{Menu_Best: 0},
-	{Sine: 0},
-	{Title: 0},
-	{music: 0},
-	{Text5: 0},
-	{CustomMovement: 0},
-	{Hook: 0},
-	{Rope: 0},
-	{GhostPlace: 0},
-	{Pin: 0},
-	{Fish_big: 0},
-	{Bomb: 0},
-	{DestroyOutsideLayout: 0},
-	{explode: 0},
-	{Fish_medium: 0},
-	{CentralScore: 0},
-	{Fish_Orange: 0},
-	{Custom: 0},
-	{Sine3: 0},
-	{Smalldolphin: 0},
-	{Bigoctopus: 0},
-	{Keyboard: 0},
-	{ScoreSpawner: 0},
-	{Spawner: 0},
-	{right_limit: 0},
-	{left_limit: 0},
-	{bg: 0},
-	{seaBottom: 0},
-	{seaBottom2: 0},
-	{seaBottom3: 0},
-	{seaBottom4: 0},
-	{seaBottom5: 0},
-	{bubbles: 0},
-	{tiny_fish: 0},
-	{tiny_fish2: 0},
-	{fisherman: 0},
-	{Sprite: 0},
-	{help: 0},
-	{LiteTween: 0},
-	{LiteTween2: 0},
-	{instructions: 0},
-	{cross: 0},
-	{opacity: 0},
-	{bubble_menu: 0},
-	{bottle: 0},
-	{zd: 0},
-	{SpriteFont_Yellow: 0},
-	{CentralScore4: 0},
-	{Display: 0},
-	{log: 0},
-	{NameText: 0},
-	{NameInput: 0},
-	{EmailText: 0},
-	{EmailInput: 0},
-	{PhoneText: 0},
-	{PhoneInput: 0},
-	{Top_10: 0},
-	{submit_button: 0},
-	{Confirmation: 0},
-	{AJAX: 0},
-	{decor: 0},
-	{High: 0},
-	{Top10: 0},
-	{Temp: 0},
-	{bubble_menu2: 0},
-	{home2: 0},
-	{winner: 0},
-	{Sprite2: 0},
-	{SponsorPopup: 0},
-	{SponsorCross: 0},
-	{VisitStore: 0},
-	{Buttons: 0},
-	{Objects: 0},
-	{octopus: 0},
-	{BarrelsandBomb: 0},
-	{input: 0},
-	{Fish: 0},
-	{Point: 0},
-	{BestScore: 0},
-	{Speed: 0},
-	{RopeState: 0},
-	{hook_speed: 0},
-	{web_app_url: 0},
-	{s: 0},
-	{value0: 0},
-	{value1: 0},
-	{value2: 0},
-	{sum: 0},
-	{string0: 0},
-	{string1: 0},
-	{string2: 0}
-];
+	self.C3_JsPropNameTable = [
+		{mouse: 0},
+		{bgPlay: 0},
+		{HUDBg: 0},
+		{divider: 0},
+		{walls: 0},
+		{Touch: 0},
+		{Score: 0},
+		{Text3: 0},
+		{replay: 0},
+		{home: 0},
+		{Panel: 0},
+		{GO_Score: 0},
+		{GO_Best: 0},
+		{Fade: 0},
+		{Fade2: 0},
+		{Transition: 0},
+		{WebStorage: 0},
+		{Audio: 0},
+		{Browser: 0},
+		{touchPLAY: 0},
+		{Menu_Best: 0},
+		{Sine: 0},
+		{Title: 0},
+		{music: 0},
+		{Text5: 0},
+		{CustomMovement: 0},
+		{Hook: 0},
+		{Rope: 0},
+		{GhostPlace: 0},
+		{Pin: 0},
+		{Fish_big: 0},
+		{Bomb: 0},
+		{DestroyOutsideLayout: 0},
+		{explode: 0},
+		{Fish_medium: 0},
+		{CentralScore: 0},
+		{Fish_Orange: 0},
+		{Custom: 0},
+		{Sine3: 0},
+		{Smalldolphin: 0},
+		{Bigoctopus: 0},
+		{Keyboard: 0},
+		{ScoreSpawner: 0},
+		{Spawner: 0},
+		{right_limit: 0},
+		{left_limit: 0},
+		{bg: 0},
+		{seaBottom: 0},
+		{seaBottom2: 0},
+		{seaBottom3: 0},
+		{seaBottom4: 0},
+		{seaBottom5: 0},
+		{bubbles: 0},
+		{tiny_fish: 0},
+		{tiny_fish2: 0},
+		{fisherman: 0},
+		{Sprite: 0},
+		{help: 0},
+		{LiteTween: 0},
+		{LiteTween2: 0},
+		{instructions: 0},
+		{cross: 0},
+		{opacity: 0},
+		{bubble_menu: 0},
+		{bottle: 0},
+		{zd: 0},
+		{SpriteFont_Yellow: 0},
+		{CentralScore4: 0},
+		{Display: 0},
+		{log: 0},
+		{NameText: 0},
+		{NameInput: 0},
+		{EmailText: 0},
+		{EmailInput: 0},
+		{PhoneText: 0},
+		{PhoneInput: 0},
+		{Top_10: 0},
+		{submit_button: 0},
+		{Confirmation: 0},
+		{AJAX: 0},
+		{decor: 0},
+		{High: 0},
+		{Top10: 0},
+		{Temp: 0},
+		{bubble_menu2: 0},
+		{home2: 0},
+		{winner: 0},
+		{Sprite2: 0},
+		{SponsorPopup: 0},
+		{SponsorCross: 0},
+		{VisitStore: 0},
+		{Buttons: 0},
+		{Objects: 0},
+		{octopus: 0},
+		{BarrelsandBomb: 0},
+		{input: 0},
+		{Fish: 0},
+		{Point: 0},
+		{BestScore: 0},
+		{Speed: 0},
+		{RopeState: 0},
+		{hook_speed: 0},
+		{web_app_url: 0},
+		{s: 0},
+		{value0: 0},
+		{value1: 0},
+		{value2: 0},
+		{sum: 0},
+		{string0: 0},
+		{string1: 0},
+		{string2: 0}
+	];
 
